@@ -1,129 +1,153 @@
- package main
+package main
 
- /*
-  #include <stdio.h>
-  #include <unistd.h>
-  #include <termios.h>
-  char getch(){
-      char ch = 0;
-      struct termios old = {0};
-      fflush(stdout);
-      if( tcgetattr(0, &old) < 0 ) perror("tcsetattr()");
-      old.c_lflag &= ~ICANON;
-      old.c_lflag &= ~ECHO;
-      old.c_cc[VMIN] = 1;
-      old.c_cc[VTIME] = 0;
-      if( tcsetattr(0, TCSANOW, &old) < 0 ) perror("tcsetattr ICANON");
-      if( read(0, &ch,1) < 0 ) perror("read()");
-      old.c_lflag |= ICANON;
-      old.c_lflag |= ECHO;
-      if(tcsetattr(0, TCSADRAIN, &old) < 0) perror("tcsetattr ~ICANON");
-      return ch;
-  }
- */
- import "C"
+import (
+	"fmt"
+	"github.com/gordonklaus/portaudio"
+	"github.com/zenwerk/go-wave"
+	"math"
+	"os"
+	"os/signal"
+	"strconv"
+	"unsafe"
+)
 
- // stackoverflow.com/questions/14094190/golang-function-similar-to-getchar
+func errCheck(err error) {
 
- import (
-         "fmt"
-         "github.com/gordonklaus/portaudio"
-         wave "github.com/zenwerk/go-wave"
-         "math/rand"
-         "os"
-         "strings"
-         "time"
- )
+	if err != nil {
+		panic(err)
+	}
+}
 
- func errCheck(err error) {
+func effect() {
 
-         if err != nil {
-                 panic(err)
-         }
- }
+	r, err := wave.NewReader("test.wav")
+	errCheck(err)
+	b, err := r.ReadRawSample()
+	errCheck(err)
+	errCheck(err)
+	//samps,err:=r.ReadSampleInt()
 
- func main() {
+	//errCheck(err)
+	fmt.Println(len(b))
+	fmt.Println("exit")
+}
 
-         if len(os.Args) != 2 {
-                 fmt.Printf("Usage : %s <audiofilename.wav>\n", os.Args[0])
-                 os.Exit(0)
-         }
+func main() {
 
-         audioFileName := os.Args[1]
+	effect()
+	return
+	cutoff := 5
+	if len(os.Args) > 1 {
+		fmt.Println(os.Args[1])
+		sec, err := strconv.ParseInt(os.Args[1], 10, 32)
+		if err == nil {
+			cutoff = int(sec)
 
-         fmt.Println("Recording. Press ESC to quit.")
+		}
 
-         if !strings.HasSuffix(audioFileName, ".wav") {
-                 audioFileName += ".wav"
-         }
-         waveFile, err := os.Create(audioFileName)
-         errCheck(err)
+		if os.Args[1] == "r" {
+			effect()
+			return
+		}
+	}
 
-         // www.people.csail.mit.edu/hubert/pyaudio/  - under the Record tab
-         inputChannels := 1
-         outputChannels := 0
-         sampleRate := 44100
-         framesPerBuffer := make([]byte, 64)
+	sig := make(chan os.Signal, 1)
 
-         // init PortAudio
+	signal.Notify(sig, os.Interrupt, os.Kill)
 
-         portaudio.Initialize()
-         //defer portaudio.Terminate()
+	audioFileName := "test.wav" //os.Args[1]
 
-         stream, err := portaudio.OpenDefaultStream(inputChannels, outputChannels, float64(sampleRate), len(framesPerBuffer), framesPerBuffer)
-         errCheck(err)
-         //defer stream.Close()
+	fmt.Println("Recording to "+audioFileName, cutoff, "seconds")
 
-         // setup Wave file writer
+	waveFile, err := os.Create(audioFileName)
+	errCheck(err)
 
-         param := wave.WriterParam{
-                 Out:           waveFile,
-                 Channel:       inputChannels,
-                 SampleRate:    sampleRate,
-                 BitsPerSample: 8, // if 16, change to WriteSample16()
-         }
+	inputChannels := 1
+	outputChannels := 0
+	sampleRate := 44100
+	buf := 4410
+	int16Slice := make([]int16, buf)
 
-         waveWriter, err := wave.NewWriter(param)
-         errCheck(err)
+	portaudio.Initialize()
+	//defer portaudio.Terminate()
 
-         //defer waveWriter.Close()
+	apis, err := portaudio.HostApis()
 
-         go func() {
-                 key := C.getch()
-                 fmt.Println()
-                 fmt.Println("Cleaning up ...")
-                 if key == 27 {
-                         // better to control
-                         // how we close then relying on defer
-                         waveWriter.Close()
-                         stream.Close()
-                         portaudio.Terminate()
-                         fmt.Println("Play", audioFileName, "with a audio player to hear the result.")
-                         os.Exit(0)
+	for i, api := range apis {
 
-                 }
+		fmt.Println(i, api.Name, api.Type)
+		for j, d := range api.Devices {
 
-         }()
+			fmt.Println(" ", j, d.Name, d.MaxInputChannels, d.MaxOutputChannels)
+		}
+	}
 
-         // recording in progress ticker. From good old DOS days.
-         ticker := []string{
-                 "-",
-                 "\\",
-                 "/",
-                 "|",
-         }
-         rand.Seed(time.Now().UnixNano())
+	stream, err := portaudio.OpenDefaultStream(inputChannels, outputChannels, float64(sampleRate), len(int16Slice), int16Slice)
+	errCheck(err)
+	//defer stream.Close()
 
-         // start reading from microphone
-         errCheck(stream.Start())
-         for {
-                 errCheck(stream.Read())
+	// setup Wave file writer
 
-                 fmt.Printf("\rRecording is live now. Say something to your microphone! [%v]", ticker[rand.Intn(len(ticker)-1)])
+	param := wave.WriterParam{
+		Out:           waveFile,
+		Channel:       inputChannels,
+		SampleRate:    sampleRate,
+		BitsPerSample: 16, // if 16, change to WriteSample16()
+	}
 
-                 // write to wave file
-                 _, err := waveWriter.Write([]byte(framesPerBuffer)) // WriteSample16 for 16 bits
-                 errCheck(err)
-         }
-         errCheck(stream.Stop())
- }
+	waveWriter, err := wave.NewWriter(param)
+	errCheck(err)
+
+	defer waveWriter.Close()
+
+	// start reading from microphone
+	errCheck(stream.Start())
+	fmt.Println("Recording is live now. Say something to your microphone!")
+	i := 0
+
+	uInt16Slice := make([]uint16, buf, buf)
+	for {
+
+		errCheck(stream.Read())
+
+		i++
+
+		uInt16Slice = *(*[]uint16)(unsafe.Pointer(&int16Slice))
+		_, err := waveWriter.WriteSample16(uInt16Slice)
+
+		errCheck(err)
+		elapsed := (i * buf) / sampleRate
+		fmt.Printf("\r %d", elapsed)
+		if cutoff != 0 && elapsed >= cutoff {
+			close(waveWriter, stream)
+		}
+		select {
+		case <-sig:
+			close(waveWriter, stream)
+		default:
+		}
+	}
+
+	errCheck(stream.Stop())
+}
+
+func close(waveWriter *wave.Writer, stream *portaudio.Stream) {
+	fmt.Println("\nclosed")
+
+	waveWriter.Close()
+	stream.Close()
+	portaudio.Terminate()
+	os.Exit(0)
+}
+
+func conv(a *[]int16, b *[]uint16) {
+
+	for i, q := range *a {
+
+		x := int32(q - math.MinInt16)
+
+		(*b)[i] = uint16(x)
+
+	}
+
+}
