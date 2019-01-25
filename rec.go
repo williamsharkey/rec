@@ -4,8 +4,13 @@ import (
 	"fmt"
 	"github.com/gordonklaus/portaudio"
 	"github.com/zenwerk/go-wave"
+	"image"
+	"image/color"
+	_ "image/png"
 	"math"
+	"path/filepath"
 	"sort"
+	"strings"
 	"unsafe"
 
 	//"math"
@@ -210,6 +215,73 @@ func read(name string) (audio []int16) {
 
 	return
 }
+func readImg(path string) image.Image {
+	infile, err := os.Open(path)
+	if err != nil {
+		// replace this with real error handling
+		panic(err.Error())
+	}
+	defer infile.Close()
+	src, _, err := image.Decode(infile)
+	if err != nil {
+		// replace this with real error handling
+		panic(err.Error())
+	}
+	return src
+}
+func imgToWaveTable(img image.Image) (int16s []int16) {
+
+	// Create a new grayscale image
+	bounds := img.Bounds()
+	w, h := bounds.Max.X, bounds.Max.Y
+
+	for x := 0; x < w; x++ {
+		for y := 0; y < h; y++ {
+			oldColor := img.At(x, y)
+
+			g := color.Gray16Model.Convert(oldColor).(color.Gray16)
+			int16s = append(int16s, int16(int(g.Y)-math.MaxUint16+math.MaxInt16))
+
+		}
+	}
+	return
+}
+
+func imgToWaveTableFixed(img image.Image) (int16s []int16) {
+
+	// Create a new grayscale image
+	bounds := img.Bounds()
+	w, h := bounds.Max.X, bounds.Max.Y
+
+	for x := 0; x < 256; x++ {
+		for y := 0; y < 2048; y++ {
+			oldColor := img.At(x*w/256, y*h/2048)
+
+			g := color.Gray16Model.Convert(oldColor).(color.Gray16)
+			int16s = append(int16s, int16(int(g.Y)-math.MaxUint16+math.MaxInt16))
+
+		}
+	}
+	return
+}
+func imgToWaveTableFixed90(img image.Image) (int16s []int16) {
+
+	// Create a new grayscale image
+	bounds := img.Bounds()
+	w, h := bounds.Max.X, bounds.Max.Y
+
+	for y := 0; y < 256; y++ {
+		for x := 0; x < 2048; x++ {
+
+			oldColor := img.At(x*w/2048, y*h/256)
+
+			g := color.Gray16Model.Convert(oldColor).(color.Gray16)
+			int16s = append(int16s, int16(int(g.Y)-math.MaxUint16+math.MaxInt16))
+
+		}
+	}
+	return
+}
 
 func main() {
 	//t:=[]int16{0, 2, 4}
@@ -246,7 +318,12 @@ func main() {
 	}
 
 	if len(os.Args) > 2 {
-
+		if os.Args[1] == "wt" {
+			img := readImg(os.Args[2])
+			wt := imgToWaveTableFixed(img)
+			write(os.Args[2]+".wt", wt)
+			return
+		}
 		if os.Args[1] == "slice" {
 			clean := read(os.Args[2])
 			wet := effect(clean)
@@ -274,6 +351,35 @@ func main() {
 			return
 		}
 
+	}
+	if len(os.Args) > 1 {
+		if os.Args[1] == "wtall" {
+			filepath.Walk(".", func(path string, f os.FileInfo, _ error) error {
+				if f.IsDir() {
+					return nil
+				}
+				if strings.Contains(path, ".git/") {
+					return nil
+				}
+				if strings.Contains(path, "/") {
+					return nil
+				}
+				if filepath.Ext(path) == ".png" {
+					fmt.Println("process " + path)
+					img := readImg(path)
+					pathT := strings.TrimRight(path, ".png")
+					wt := imgToWaveTableFixed(img)
+
+					write(pathT, wt)
+					wt = imgToWaveTableFixed90(img)
+
+					write(pathT+"_rot", wt)
+				}
+				return nil
+			})
+
+			return
+		}
 	}
 }
 
