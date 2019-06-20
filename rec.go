@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/gordonklaus/portaudio"
 	"github.com/zenwerk/go-wave"
 	"image"
 	"image/color"
@@ -15,17 +14,9 @@ import (
 
 	//"math"
 	"os"
-	"os/signal"
 	"strconv"
 	//"unsafe"
 )
-
-func errCheck(err error) {
-
-	if err != nil {
-		panic(err)
-	}
-}
 
 func copyArr(a []int16) (b []int16) {
 	b = make([]int16, len(a))
@@ -204,10 +195,12 @@ func convSafe(b []byte) []int16 {
 	return r
 }
 
-func read(name string) (audio []int16) {
+func read(name string) (audio []int16, err error) {
 
 	r, err := wave.NewReader(name + ".wav")
-	errCheck(err)
+	if err != nil {
+		return
+	}
 	b := make([]byte, r.NumSamples*2, r.NumSamples*2)
 	r.Read(b)
 
@@ -283,7 +276,7 @@ func imgToWaveTableFixed90(img image.Image) (int16s []int16) {
 	return
 }
 
-func main() {
+func mainRec() {
 	//t:=[]int16{0, 2, 4}
 	//z:=resamp(t,6)
 	//fmt.Printf("%+v\n",z )
@@ -311,7 +304,7 @@ func main() {
 			}
 			name := os.Args[2]
 			fmt.Printf("rec command, filename: %s, seconds %d", name, cutoff)
-			rec(cutoff, name)
+			Record(cutoff, name, func(s string) {}, func() {}, func(s string) {})
 			return
 		}
 
@@ -325,27 +318,44 @@ func main() {
 			return
 		}
 		if os.Args[1] == "slice" {
-			clean := read(os.Args[2])
+			clean, err := read(os.Args[2])
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 			wet := effect(clean)
 			write(os.Args[2]+".slice", wet)
 			return
 		}
 
 		if os.Args[1] == "slice2" {
-			clean := read(os.Args[2])
+			clean, err := read(os.Args[2])
+
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 			wet := effect2(clean)
 			write(os.Args[2]+".slice2", wet)
 			return
 		}
 
 		if os.Args[1] == "blur" {
-			clean := read(os.Args[2])
+			clean, err := read(os.Args[2])
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 			wet := blur(clean)
 			write(os.Args[2]+".blur", wet)
 			return
 		}
 		if os.Args[1] == "blur2" {
-			clean := read(os.Args[2])
+			clean, err := read(os.Args[2])
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 			wet := blur2n(clean, 10)
 			write(os.Args[2]+".blur2", wet)
 			return
@@ -383,7 +393,7 @@ func main() {
 	}
 }
 
-func write(s string, int16s []int16) {
+func write(s string, int16s []int16) (err error) {
 	waveFile, err := os.Create(s + ".wav")
 	param := wave.WriterParam{
 		Out:           waveFile,
@@ -393,101 +403,13 @@ func write(s string, int16s []int16) {
 	}
 
 	waveWriter, err := wave.NewWriter(param)
-	errCheck(err)
+	if err != nil {
+		return
+	}
 	_, err = waveWriter.WriteSample16(int16s)
-
-	errCheck(err)
-
+	if err != nil {
+		return
+	}
 	waveWriter.Close()
-
-}
-
-func rec(cutoff int, name string) {
-	sig := make(chan os.Signal, 1)
-
-	signal.Notify(sig, os.Interrupt, os.Kill)
-
-	audioFileName := name + ".wav" //os.Args[1]
-
-	fmt.Println("Recording to "+audioFileName, cutoff, "seconds")
-
-	waveFile, err := os.Create(audioFileName)
-	errCheck(err)
-
-	inputChannels := 1
-	outputChannels := 0
-	sampleRate := 44100
-	buf := 4410
-	int16Slice := make([]int16, buf)
-
-	portaudio.Initialize()
-	//defer portaudio.Terminate()
-
-	apis, err := portaudio.HostApis()
-
-	for i, api := range apis {
-
-		fmt.Println(i, api.Name, api.Type)
-		for j, d := range api.Devices {
-
-			fmt.Println(" ", j, d.Name, d.MaxInputChannels, d.MaxOutputChannels)
-		}
-	}
-
-	stream, err := portaudio.OpenDefaultStream(inputChannels, outputChannels, float64(sampleRate), len(int16Slice), int16Slice)
-	errCheck(err)
-	//defer stream.Close()
-
-	// setup Wave file writer
-
-	param := wave.WriterParam{
-		Out:           waveFile,
-		Channel:       inputChannels,
-		SampleRate:    sampleRate,
-		BitsPerSample: 16, // if 16, change to WriteSample16()
-	}
-
-	waveWriter, err := wave.NewWriter(param)
-	errCheck(err)
-
-	defer waveWriter.Close()
-
-	// start reading from microphone
-	errCheck(stream.Start())
-	fmt.Println("Recording is live now. Say something to your microphone!")
-	i := 0
-
-	//uInt16Slice := make([]uint16, buf, buf)
-	for {
-
-		errCheck(stream.Read())
-
-		i++
-
-		//uInt16Slice = *(*[]uint16)(unsafe.Pointer(&int16Slice))
-		_, err := waveWriter.WriteSample16(int16Slice)
-
-		errCheck(err)
-		elapsed := (i * buf) / sampleRate
-		fmt.Printf("\r %d", elapsed)
-		if cutoff != 0 && elapsed >= cutoff {
-			close(waveWriter, stream)
-		}
-		select {
-		case <-sig:
-			close(waveWriter, stream)
-		default:
-		}
-	}
-
-	errCheck(stream.Stop())
-}
-
-func close(waveWriter *wave.Writer, stream *portaudio.Stream) {
-	fmt.Println("\nclosed")
-
-	waveWriter.Close()
-	stream.Close()
-	portaudio.Terminate()
-	os.Exit(0)
+	return
 }
