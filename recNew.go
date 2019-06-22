@@ -32,6 +32,8 @@ func recInit() (set *RecSettings, err error) {
 		make(chan int),
 		make(chan [buf]int16),
 		make(chan string),
+		nil,
+		nil,
 	}, err
 }
 

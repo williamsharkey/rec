@@ -5,37 +5,70 @@ import (
 	"github.com/gordonklaus/portaudio"
 	"github.com/williamsharkey/tui-go"
 	"github.com/zenwerk/go-wave"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
-	"time"
 )
 
-type post struct {
-	username string
-	message  string
-	time     string
+type Recording struct {
+	Name    string
+	Samples uint32
 }
 
-var posts = []post{
-	{username: "john", message: "hi, what's up?", time: "14:41"},
-	{username: "jane", message: "not much", time: "14:43"},
-}
+//var Recs []Recording
 
-var i = 0
+func loadRecs() (recs []Recording) {
+	path := filepath.Join(".", "wavs")
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return
+	}
+	for _, file := range files {
+		n := file.Name()
+		ext := filepath.Ext(n)
+		name := strings.TrimSuffix(n, ext)
+		if err != nil {
+			continue
+		}
+		recs = append(recs, Recording{name, 0})
+	}
+	return
+}
 
 func click(rs *RecSettings) {
 	rs.Rec = !rs.Rec
 
 	if rs.Rec {
 		go recNew(rs)
-		newpath := filepath.Join(".", "rec")
-		os.MkdirAll(newpath, os.ModePerm)
 
-		audioFileName := filepath.Join(newpath, fmt.Sprintf("%03d.wav", i))
+		newpath := filepath.Join(".", "wavs")
+		err := os.MkdirAll(newpath, os.ModePerm)
 
-		i = i + 1
+		files, err := ioutil.ReadDir(newpath)
+		if err != nil {
+			return
+		}
+
+		var max int64 = 0
+		for _, file := range files {
+			n := file.Name()
+			ext := filepath.Ext(n)
+			name := strings.TrimSuffix(n, ext)
+			curr, errP := strconv.ParseInt(name, 10, 64)
+			if errP != nil {
+				continue
+			}
+			if curr > max {
+				max = curr
+			}
+		}
+
+		fn := fmt.Sprintf("%03d", max+1)
+		audioFileName := filepath.Join(newpath, fn+".wav")
+
 		waveFile, err := os.Create(audioFileName)
 		if err != nil {
 			return
@@ -57,24 +90,23 @@ func click(rs *RecSettings) {
 			case <-rs.Print:
 				//fmt.Println("s received", p)
 			case samps := <-rs.Aud:
-				_, err := waveWriter.WriteSample16(samps[:])
+				waveWriter.WriteSample16(samps[:])
 				if err != nil {
 					waveWriter.Close()
 					waveFile.Close()
 					return
 				}
-				//fmt.Print(",")
+
 			case <-rs.Complete:
 				waveWriter.Close()
 				waveFile.Close()
-				//fmt.Println("s complete")
+				histAppend(rs.RecList, Recording{fn, 0}, rs.UI)
 				break Loop2
 			default:
 			}
 		}
 	} else {
 		rs.Kill <- 1
-
 	}
 }
 
@@ -86,102 +118,21 @@ type RecSettings struct {
 	Complete chan int
 	Aud      chan [1024]int16
 	Print    chan string
+	RecList  *tui.Flexlist
+	UI       *tui.UI
 }
 
-func test() {
-
+func main() {
+	recs := loadRecs()
 	rs, err := recInit()
 	if err != nil {
 		return
 	}
 
-	//err=rs.Stream.Start()
-	//if err!=nil{
-	//	return
-	//}
-	go click(rs)
-	time.Sleep(1 * time.Second)
-	go click(rs)
-	time.Sleep(4 * time.Second)
-	go click(rs)
-	time.Sleep(1 * time.Second)
-	go click(rs)
-	time.Sleep(4 * time.Second)
-	go click(rs)
-	time.Sleep(1 * time.Second)
-	go click(rs)
-	time.Sleep(4 * time.Second)
-	go click(rs)
-	time.Sleep(1 * time.Second)
-	go click(rs)
-	time.Sleep(4 * time.Second)
-	//
-	//go recNew(settings)
-	//
-	//go func(){
-	//	time.Sleep(1*time.Second)
-	//	settings.Kill<-1
-	//}()
-	//
-	//Loop:
-	//for {
-	//	select {
-	//	case p := <-settings.Print:
-	//		fmt.Println("received", p)
-	//	case <-settings.Aud:
-	//		fmt.Print(".")
-	//	case <-settings.Complete:
-	//		fmt.Println("complete")
-	//		break Loop
-	//	default:
-	//	}
-	//}
-	//
-	//fmt.Println("hello")
-
-}
-func main() {
-	//test()
-	//return
-
-	//kill := make(chan int, 1)
-	//msg := make(chan string, 1)
-	//rec := make(chan [1024]int16, 1)
-	//p, sl, err := recInit()
-	//if err != nil {
-	//	return
-	//}
-	//go recNew(kill, msg, p, sl, rec)
-	//
-	//i := 0
-	//z := 0
-	//for {
-	//
-	//	select {
-	//	case <-rec:
-	//
-	//		z = z + 1
-	//		fmt.Print(".")
-	//		i = (i + 1) % 80
-	//		if i == 0 {
-	//			fmt.Println()
-	//		}
-	//		if z == 200 {
-	//			kill <- 333
-	//		}
-	//
-	//	case p := <-msg:
-	//		fmt.Println(p)
-	//		fmt.Printf("z = %d\n", z)
-	//	default:
-	//	}
-	//}
-	//
-	//return
-
 	root := tui.NewHBox()
 
 	ui, err := tui.New(root)
+	rs.UI = &ui
 	if err != nil {
 		s := err.Error()
 		fmt.Println(s)
@@ -196,9 +147,22 @@ func main() {
 
 	playBtn.OnActivated(func(b *tui.Button) {})
 
-	recBtn := tui.NewButton("rec")
+	recList := tui.NewFlexlist()
+	rs.RecList = recList // tui.NewVBox()
 
-	rs, err := recInit()
+	for _, m := range recs {
+		histAppend(rs.RecList, m, rs.UI)
+	}
+
+	//historyScroll := tui.NewScrollArea(rs.History)
+	//historyScroll.SetAutoscrollToBottom(true)
+
+	historyBox := tui.NewVBox(recList)
+	//recList.OnItemActivated(func(f *tui.Flexlist){historyBox.SetFocused(true)})
+	historyBox.SetBorder(true)
+	historyBox.SetTitle("wavs")
+
+	recBtn := tui.NewButton("rec")
 
 	recBtn.OnActivated(func(b *tui.Button) {
 		if rs.Rec {
@@ -213,42 +177,12 @@ func main() {
 	sidebar := tui.NewVBox(
 		playBtn,
 		recBtn,
-		//tui.NewLabel("CHANNELS"),
-		//tui.NewLabel("general"),
-		//tui.NewLabel("random"),
-		//tui.NewLabel(""),
-		//tui.NewLabel("DIRECT MESSAGES"),
-		//tui.NewLabel("slackbot"),
 		tui.NewSpacer(),
 		exitBtn,
 	)
 	sidebar.SetBorder(true)
 
-	history := tui.NewVBox()
-
-	for _, m := range posts {
-		history.Append(tui.NewHBox(
-			tui.NewLabel(m.time),
-			tui.NewPadder(1, 0, tui.NewLabel(fmt.Sprintf("<%s>", m.username))),
-			tui.NewLabel(m.message),
-			tui.NewSpacer(),
-		))
-	}
-
-	historyScroll := tui.NewScrollArea(history)
-	historyScroll.SetAutoscrollToBottom(true)
-
-	historyBox := tui.NewVBox(historyScroll)
-	historyBox.SetBorder(true)
-
-	//
-	//btn := tui.NewButton("hey")
-	//btn.OnActivated(func(b *tui.Button){
-	//	fmt.Println("hey")
-	//})
-
 	input := tui.NewEntry()
-	//input.SetFocused(true)
 	input.SetSizePolicy(tui.Expanding, tui.Maximum)
 
 	inputBox := tui.NewHBox(input)
@@ -257,21 +191,15 @@ func main() {
 
 	inputBox.SetSizePolicy(tui.Expanding, tui.Maximum)
 
-	i2 := tui.NewEntry()
-
-	i2.SetSizePolicy(tui.Expanding, tui.Maximum)
-	i2b := tui.NewVBox(i2)
-	i2b.SetBorder(true)
-	i2b.SetTitle("i2b")
-
-	chat := tui.NewVBox(historyBox, inputBox, i2b)
+	chat := tui.NewVBox(historyBox, inputBox)
 	chat.SetSizePolicy(tui.Expanding, tui.Expanding)
 
-	//root := tui.NewHB
-	// ox(chat,sidebar)
 	root.Append(sidebar)
 	root.Append(chat)
-	tui.DefaultFocusChain.Set(playBtn, recBtn, exitBtn, input, i2)
+	tui.DefaultFocusChain.Set(playBtn, recBtn, exitBtn,
+
+		recList,
+		input)
 
 	ui.SetKeybinding("Esc", func() { ui.Quit() })
 
@@ -282,25 +210,20 @@ func main() {
 			return
 		}
 
+		histAppend(rs.RecList, Recording{e.Text(), 0}, rs.UI)
 		if strings.HasPrefix(e.Text(), "play ") {
-			history.Append(tui.NewHBox(
-				tui.NewLabel(e.Text()),
-				tui.NewSpacer(),
-			))
 			return
-			//input.SetText("")
-
 		}
-		history.Append(tui.NewHBox(
-			tui.NewLabel(time.Now().Format("15:04")),
-			tui.NewPadder(1, 0, tui.NewLabel(fmt.Sprintf("<%s>", "johnny"))),
-			tui.NewLabel(e.Text()),
-			tui.NewSpacer(),
-		))
+
 		input.SetText("")
 	})
 
 	if err := ui.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+func histAppend(box *tui.Flexlist, m Recording, u *tui.UI) {
+	box.AddItems(m.Name)
+	box.Select(box.Length() - 1)
+	(*u).Repaint()
 }
