@@ -1,19 +1,23 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"github.com/gordonklaus/portaudio"
 	"github.com/williamsharkey/tui-go-copy"
-	"github.com/zenwerk/go-wave"
 	"io/ioutil"
 	"log"
-	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 )
 
 func main() {
+	err := portaudio.Initialize()
+	if err != nil {
+		return
+	}
+	defer portaudio.Terminate()
 
 	recs := loadRecs()
 	rs, err := recInit()
@@ -21,6 +25,9 @@ func main() {
 		return
 	}
 
+	//play("064")
+	//clickPlay("064",func(t string){fmt.Print(t)},rs)
+	//return
 	//clickPlay("044",func(t string){fmt.Print(t)},rs)
 	//clickRec(rs)
 
@@ -35,6 +42,26 @@ func main() {
 		return
 	}
 
+	cmdList := tui.NewList()
+	cmdList.AddItems("noise", "play", "rec", "nums", "exit")
+	cmdList.Select(0)
+	cmdList.OnItemActivated(func(l *tui.List) {
+		switch l.SelectedItem() {
+		case "noise":
+			go noise()
+		case "play":
+			go play(rs.RecList.SelectedItem())
+		case "exit":
+			ui.Quit()
+		case "nums":
+			go clickNum(rs)
+		default:
+		}
+	})
+
+	cmdBox := tui.NewVBox(cmdList)
+	cmdBox.SetBorder(true)
+
 	exitBtn := tui.NewButton("exit")
 
 	exitBtn.OnActivated(func(b *tui.Button) { ui.Quit() })
@@ -42,15 +69,21 @@ func main() {
 	playBtn := tui.NewButton("play")
 
 	recList := tui.NewList()
+
+	recList.OnItemActivated(func(l *tui.List) {
+		go play(l.SelectedItem())
+	})
+
 	rs.RecList = recList
 
 	playBtn.OnActivated(func(b *tui.Button) {
-		if rs.Play.Active {
-			b.SetText("play")
-		} else {
-			b.SetText("PLAY")
-		}
-		go clickPlay(rs.RecList.SelectedItem(), func(t string) { b.SetText(t) }, rs)
+		//if rs.Play.Active {
+		//	b.SetText("play")
+		//} else {
+		//	b.SetText("PLAY")
+		//}
+		go play(rs.RecList.SelectedItem())
+		//go clickPlay(rs.RecList.SelectedItem(), func(t string) { b.SetText(t) }, rs)
 
 	})
 
@@ -93,9 +126,10 @@ func main() {
 	chat := tui.NewVBox(historyBox, inputBox)
 	chat.SetSizePolicy(tui.Expanding, tui.Expanding)
 
+	hbox.Append(cmdBox)
 	hbox.Append(sidebar)
 	hbox.Append(chat)
-	tui.DefaultFocusChain.Set(playBtn, recBtn, exitBtn,
+	tui.DefaultFocusChain.Set(cmdList, playBtn, recBtn, exitBtn,
 		recList,
 		input)
 
@@ -139,122 +173,18 @@ func loadRecs() (recs []string) {
 	return
 }
 
-func clickRec(rs *RecSettings) {
-	s := rs.Rec
-	s.Active = !s.Active
-
-	if rs.Rec.Active {
-		go recNew(rs)
-
-		newpath := filepath.Join(".", "wavs")
-		err := os.MkdirAll(newpath, os.ModePerm)
-
-		files, err := ioutil.ReadDir(newpath)
-		if err != nil {
-			return
-		}
-
-		var max int64 = 0
-		for _, file := range files {
-			n := file.Name()
-			ext := filepath.Ext(n)
-			name := strings.TrimSuffix(n, ext)
-			curr, errP := strconv.ParseInt(name, 10, 64)
-			if errP != nil {
-				continue
-			}
-			if curr > max {
-				max = curr
-			}
-		}
-
-		fn := fmt.Sprintf("%03d", max+1)
-		audioFileName := filepath.Join(newpath, fn+".wav")
-
-		waveFile, err := os.Create(audioFileName)
-		if err != nil {
-			return
-		}
-		param := wave.WriterParam{
-			Out:           waveFile,
-			Channel:       1,
-			SampleRate:    44100,
-			BitsPerSample: 16,
-		}
-
-		waveWriter, err := wave.NewWriter(param)
-		if err != nil {
-			return
-		}
-	Loop2:
-		for {
-			select {
-			case <-rs.Rec.Print:
-				//fmt.Println("s received", p)
-			case samps := <-rs.Rec.Buffer:
-				waveWriter.WriteSample16(samps[:])
-				if err != nil {
-					waveWriter.Close()
-					waveFile.Close()
-					return
-				}
-
-			case <-rs.Rec.Complete:
-				waveWriter.Close()
-				waveFile.Close()
-				histAppend(rs.RecList, rs.UI, fn)
-				break Loop2
-			default:
-			}
-		}
-	} else {
-		rs.Rec.Kill <- 1
+func int32ToByte(f int32) []byte {
+	var buf bytes.Buffer
+	err := binary.Write(&buf, binary.BigEndian, f)
+	if err != nil {
+		fmt.Println("binary.Write failed:", err)
 	}
-}
-
-func clickPlay(fn string, setBtn func(string), rs *RecSettings) {
-
-	if fn == "" {
-		return
-	}
-	s := rs.Play
-	s.Active = !s.Active
-
-	if s.Active {
-		go playNew(fn, rs)
-
-	LoopPlay:
-		for {
-			select {
-			case p := <-s.Print:
-				fmt.Println("received", p)
-			//case samps := <-rs.Rec.Buffer:
-			//	waveWriter.WriteSample16(samps[:])
-			//	if err != nil {
-			//		waveWriter.Close()
-			//		waveFile.Close()
-			//		return
-			//	}
-
-			case t := <-s.Complete:
-				fmt.Println("play complete", t)
-				setBtn("play")
-				s.Active = false
-				//waveWriter.Close()
-				//waveFile.Close()
-				//histAppend(rs.RecList, rs.UI, fn)
-				break LoopPlay
-			default:
-			}
-		}
-	} else {
-		s.Kill <- 1
-	}
+	return buf.Bytes()
 }
 
 type RecSettings struct {
 	Rec, Play *AudioChan
-	RecSlice  []int16
+	RecSlice  []int32
 	PlaySlice []int16
 	RecList   *tui.List
 	UI        *tui.UI
@@ -263,7 +193,7 @@ type AudioChan struct {
 	Active   bool
 	Kill     chan int
 	Complete chan int
-	Buffer   chan [1024]int16
+	Buffer   chan [1024]int32
 	Print    chan string
 	PAStream *portaudio.Stream
 }
