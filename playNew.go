@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/zenwerk/go-wave"
+	"github.com/williamsharkey/rec/go-wave"
 	"path/filepath"
 )
 
@@ -46,7 +46,7 @@ func playNew(fn string, rs *RecSettings) (err error) {
 		default:
 
 		}
-		f, err := wavReader.ReadSampleInt16()
+		f, err := wavReader.ReadSample16()
 
 		if err != nil {
 			s.PAStream.Stop()

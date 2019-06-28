@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/zenwerk/go-wave"
+	"github.com/williamsharkey/rec/go-wave"
 	"image"
 	"image/color"
 	_ "image/png"

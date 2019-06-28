@@ -6,7 +6,7 @@ import (
 	//"fmt"
 	//"github.com/gordonklaus/portaudio"
 	"github.com/gordonklaus/portaudio"
-	"github.com/zenwerk/go-wave"
+	"github.com/williamsharkey/rec/go-wave"
 	"os"
 	//"os"
 	//"os/signal"

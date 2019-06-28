@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"github.com/gordonklaus/portaudio"
 	"github.com/williamsharkey/tui-go-copy"
@@ -171,15 +169,6 @@ func loadRecs() (recs []string) {
 		recs = append(recs, name)
 	}
 	return
-}
-
-func int32ToByte(f int32) []byte {
-	var buf bytes.Buffer
-	err := binary.Write(&buf, binary.BigEndian, f)
-	if err != nil {
-		fmt.Println("binary.Write failed:", err)
-	}
-	return buf.Bytes()
 }
 
 type RecSettings struct {
