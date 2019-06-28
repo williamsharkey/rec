@@ -5,16 +5,24 @@ import (
 	"github.com/williamsharkey/go-wave"
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
 )
 
+var sig = make(chan os.Signal, 1)
+
+func init() {
+
+	signal.Notify(sig, os.Interrupt, os.Kill)
+}
 func clickRec(rs *RecSettings) {
 	s := rs.Rec
 	s.Active = !s.Active
 
 	if rs.Rec.Active {
+
 		go recNew(rs)
 
 		newpath := filepath.Join(".", "wavs")
@@ -48,6 +56,8 @@ func clickRec(rs *RecSettings) {
 		if err != nil {
 			return
 		}
+		defer waveFile.Close()
+
 		param := wave.WriterParam{
 			Out:           waveFile,
 			Channel:       1,
@@ -59,9 +69,17 @@ func clickRec(rs *RecSettings) {
 		if err != nil {
 			return
 		}
+		defer waveWriter.Close()
 	Loop2:
 		for {
 			select {
+			case <-sig:
+				return
+				//panic("yo")
+				//waveWriter.Close()
+				//waveFile.Close()
+				//histAppend(rs.RecList, rs.UI, fn)
+				//break Loop2
 			case <-rs.Rec.Print:
 				//fmt.Println("s received", p)
 			case samps := <-rs.Rec.Buffer:
@@ -86,6 +104,7 @@ func clickRec(rs *RecSettings) {
 				waveFile.Close()
 				histAppend(rs.RecList, rs.UI, fn)
 				break Loop2
+
 			default:
 			}
 		}

@@ -6,6 +6,7 @@ import (
 	"github.com/williamsharkey/tui-go-copy"
 	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -50,7 +51,7 @@ func main() {
 		case "play":
 			go play(rs.RecList.SelectedItem())
 		case "exit":
-			ui.Quit()
+			exit(ui)
 		case "nums":
 			go clickNum(rs)
 		default:
@@ -62,7 +63,7 @@ func main() {
 
 	exitBtn := tui.NewButton("exit")
 
-	exitBtn.OnActivated(func(b *tui.Button) { ui.Quit() })
+	exitBtn.OnActivated(func(b *tui.Button) { exit(ui) })
 
 	playBtn := tui.NewButton("play")
 
@@ -131,12 +132,12 @@ func main() {
 		recList,
 		input)
 
-	ui.SetKeybinding("Esc", func() { ui.Quit() })
+	ui.SetKeybinding("Esc", func() { exit(ui) })
 
 	input.OnSubmit(func(e *tui.Entry) {
 		t := e.Text()
 		if t == "quit" || t == "exit" {
-			ui.Quit()
+			exit(ui)
 			return
 		}
 
@@ -151,6 +152,11 @@ func main() {
 	if err := ui.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func exit(ui tui.UI) {
+	sig <- os.Kill
+	ui.Quit()
 }
 
 func loadRecs() (recs []string) {

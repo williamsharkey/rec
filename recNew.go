@@ -5,6 +5,7 @@ import (
 )
 
 func recNew(rs *RecSettings) (err error) {
+
 	recArr := [1024]int32{}
 	s := rs.Rec
 	err = s.PAStream.Start()
@@ -12,6 +13,7 @@ func recNew(rs *RecSettings) (err error) {
 		return
 	}
 	rs.Rec.Print <- "started recording"
+
 	for {
 
 		select {
@@ -25,6 +27,15 @@ func recNew(rs *RecSettings) (err error) {
 
 			s.Complete <- 1
 			return
+		//case <-sig:
+		//	s.PAStream.Stop()
+		//	//if err != nil {
+		//	//	return
+		//	//}
+		//	s.Print <- "killed with os sig"
+		//
+		//	s.Complete <- 1
+		//	break recloop
 
 		default:
 		}
@@ -44,4 +55,5 @@ func recNew(rs *RecSettings) (err error) {
 		s.Buffer <- recArr
 
 	}
+	return
 }
