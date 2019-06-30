@@ -396,10 +396,11 @@ func mainRec() {
 func write(s string, int16s []int16) (err error) {
 	waveFile, err := os.Create(s + ".wav")
 	param := wave.WriterParam{
-		Out:           waveFile,
-		Channel:       1,
-		SampleRate:    44100,
-		BitsPerSample: 16, // if 16, change to WriteSample16()
+		wave.WAVE_FORMAT_PCM,
+		waveFile,
+		1,
+		44100,
+		16,
 	}
 
 	waveWriter, err := wave.NewWriter(param)

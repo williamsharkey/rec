@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	//"github.com/gordonklaus/portaudio"
+	//"github.com/williamsharkey/rec/portaudio"
 	//"fmt"
-	//"github.com/gordonklaus/portaudio"
-	"github.com/gordonklaus/portaudio"
+	//"github.com/williamsharkey/rec/portaudio"
 	"github.com/williamsharkey/rec/go-wave"
+	"github.com/williamsharkey/rec/portaudio"
 	"os"
 	//"os"
 	//"os/signal"

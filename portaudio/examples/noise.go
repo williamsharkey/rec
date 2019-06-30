@@ -6,31 +6,25 @@ import (
 	"time"
 )
 
-func noise() {
-
+func main() {
+	portaudio.Initialize()
+	defer portaudio.Terminate()
 	h, err := portaudio.DefaultHostApi()
-	if err != nil {
-		return
-	}
-
+	chk(err)
 	stream, err := portaudio.OpenStream(portaudio.HighLatencyParameters(nil, h.DefaultOutputDevice), func(out []int32) {
 		for i := range out {
 			out[i] = int32(rand.Uint32())
-			//fmt.Println(int32(rand.Uint32()))
 		}
 	})
-	if err != nil {
-		return
-	}
+	chk(err)
 	defer stream.Close()
-	err = stream.Start()
-	if err != nil {
-		return
-	}
+	chk(stream.Start())
 	time.Sleep(time.Second)
-	err = stream.Stop()
-	if err != nil {
-		return
-	}
+	chk(stream.Stop())
+}
 
+func chk(err error) {
+	if err != nil {
+		panic(err)
+	}
 }

@@ -1,6 +1,6 @@
 package main
 
-import "github.com/gordonklaus/portaudio"
+import "github.com/williamsharkey/rec/portaudio"
 
 func recInit() (set *RecSettings, err error) {
 	const bufLen = 1024
@@ -23,6 +23,7 @@ func recInit() (set *RecSettings, err error) {
 		&AudioChan{false, make(chan int), make(chan int), make(chan [bufLen]int32), make(chan string), playPAStream},
 		recSlice,
 		playSlice,
+		nil,
 		nil,
 		nil,
 	}, err

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/gordonklaus/portaudio"
 	"github.com/williamsharkey/go-wave"
+	"github.com/williamsharkey/rec/portaudio"
 	"math"
 	"path/filepath"
 	"time"

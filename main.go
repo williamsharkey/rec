@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/gordonklaus/portaudio"
+	"github.com/williamsharkey/rec/portaudio"
 	"github.com/williamsharkey/tui-go-copy"
 	"io/ioutil"
 	"log"
@@ -41,17 +41,26 @@ func main() {
 		return
 	}
 
+	recToggle := func() {
+		if rs.Rec.Active {
+			rs.CmdList.ChangeItem("REC", "rec")
+		} else {
+			rs.CmdList.ChangeItem("rec", "REC")
+		}
+		go clickRec(rs)
+	}
 	cmdList := tui.NewList()
+	rs.CmdList = cmdList
 	cmdList.AddItems("noise", "play", "rec", "nums", "exit")
 	cmdList.Select(0)
 	cmdList.OnItemActivated(func(l *tui.List) {
-		switch l.SelectedItem() {
+		switch strings.ToLower(l.SelectedItem()) {
 		case "noise":
 			go noise()
-		case "play":
-			go play(rs.RecList.SelectedItem())
 		case "exit":
 			exit(ui)
+		case "rec":
+			recToggle()
 		case "nums":
 			go clickNum(rs)
 		default:
@@ -61,12 +70,6 @@ func main() {
 	cmdBox := tui.NewVBox(cmdList)
 	cmdBox.SetBorder(true)
 
-	exitBtn := tui.NewButton("exit")
-
-	exitBtn.OnActivated(func(b *tui.Button) { exit(ui) })
-
-	playBtn := tui.NewButton("play")
-
 	recList := tui.NewList()
 
 	recList.OnItemActivated(func(l *tui.List) {
@@ -75,43 +78,12 @@ func main() {
 
 	rs.RecList = recList
 
-	playBtn.OnActivated(func(b *tui.Button) {
-		//if rs.Play.Active {
-		//	b.SetText("play")
-		//} else {
-		//	b.SetText("PLAY")
-		//}
-		go play(rs.RecList.SelectedItem())
-		//go clickPlay(rs.RecList.SelectedItem(), func(t string) { b.SetText(t) }, rs)
-
-	})
-
 	histAppend(rs.RecList, rs.UI, recs...)
 
 	historyBox := tui.NewVBox(recList)
 
 	historyBox.SetBorder(true)
 	historyBox.SetTitle("wavs")
-
-	recBtn := tui.NewButton("rec")
-
-	recBtn.OnActivated(func(b *tui.Button) {
-		if rs.Rec.Active {
-			b.SetText("rec")
-		} else {
-			b.SetText("REC")
-		}
-		go clickRec(rs)
-
-	})
-
-	sidebar := tui.NewVBox(
-		playBtn,
-		recBtn,
-		tui.NewSpacer(),
-		exitBtn,
-	)
-	sidebar.SetBorder(true)
 
 	input := tui.NewEntry()
 	input.SetSizePolicy(tui.Expanding, tui.Maximum)
@@ -126,13 +98,11 @@ func main() {
 	chat.SetSizePolicy(tui.Expanding, tui.Expanding)
 
 	hbox.Append(cmdBox)
-	hbox.Append(sidebar)
 	hbox.Append(chat)
-	tui.DefaultFocusChain.Set(cmdList, playBtn, recBtn, exitBtn,
-		recList,
-		input)
+	tui.DefaultFocusChain.Set(cmdList, recList, input)
 
 	ui.SetKeybinding("Esc", func() { exit(ui) })
+	ui.SetKeybinding("R", recToggle)
 
 	input.OnSubmit(func(e *tui.Entry) {
 		t := e.Text()
@@ -140,12 +110,7 @@ func main() {
 			exit(ui)
 			return
 		}
-
 		histAppend(rs.RecList, rs.UI, e.Text())
-		if strings.HasPrefix(e.Text(), "play ") {
-			return
-		}
-
 		input.SetText("")
 	})
 
@@ -183,6 +148,7 @@ type RecSettings struct {
 	PlaySlice []int16
 	RecList   *tui.List
 	UI        *tui.UI
+	CmdList   *tui.List
 }
 type AudioChan struct {
 	Active   bool
