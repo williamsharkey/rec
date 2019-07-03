@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/williamsharkey/go-wave"
+	"github.com/williamsharkey/rec/go-wave"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -102,7 +102,12 @@ func clickRec(rs *RecSettings) {
 			case <-rs.Rec.Complete:
 				waveWriter.Close()
 				waveFile.Close()
-				histAppend(rs.RecList, rs.UI, fn)
+
+				//f,err:=waveFile.Stat()
+				//if err==nil{waveWriter
+
+				histAppend(rs, nameSize{fn, int64(waveWriter.RiffChunk.Size)}) //f.Size()})
+				//}
 				break Loop2
 
 			default:

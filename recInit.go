@@ -26,5 +26,6 @@ func recInit() (set *RecSettings, err error) {
 		nil,
 		nil,
 		nil,
+		nil,
 	}, err
 }

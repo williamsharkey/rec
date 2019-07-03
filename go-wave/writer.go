@@ -26,7 +26,7 @@ type Writer struct {
 	out            io.WriteCloser // 実際に書きだすファイルや bytes など
 	writtenSamples int            // 書き込んだサンプル数
 
-	riffChunk *RiffChunk
+	RiffChunk *RiffChunk
 	fmtChunk  *FmtChunk
 	dataChunk *DataWriterChunk
 }
@@ -40,7 +40,7 @@ func NewWriter(param WriterParam) (*Writer, error) {
 	//	fmt.Println(blockSize, param.SampleRate, samplesPerSec)
 
 	// riff chunk
-	w.riffChunk = &RiffChunk{
+	w.RiffChunk = &RiffChunk{
 		ID:         []byte(riffChunkToken),
 		FormatType: []byte(waveFormatType),
 	}
@@ -143,14 +143,14 @@ func (ew *errWriter) Write(order binary.ByteOrder, data interface{}) {
 func (w *Writer) Close() error {
 	data := w.dataChunk.Data.Bytes()
 	dataSize := uint32(len(data))
-	w.riffChunk.Size = uint32(len(w.riffChunk.ID)) + (8 + w.fmtChunk.Size) + (8 + dataSize)
+	w.RiffChunk.Size = uint32(len(w.RiffChunk.ID)) + (8 + w.fmtChunk.Size) + (8 + dataSize)
 	w.dataChunk.Size = dataSize
 
 	ew := &errWriter{w: w.out}
 	// riff chunk
-	ew.Write(binary.BigEndian, w.riffChunk.ID)
-	ew.Write(binary.LittleEndian, w.riffChunk.Size)
-	ew.Write(binary.BigEndian, w.riffChunk.FormatType)
+	ew.Write(binary.BigEndian, w.RiffChunk.ID)
+	ew.Write(binary.LittleEndian, w.RiffChunk.Size)
+	ew.Write(binary.BigEndian, w.RiffChunk.FormatType)
 
 	// fmt chunk
 	ew.Write(binary.BigEndian, w.fmtChunk.ID)

@@ -12,13 +12,16 @@ import (
 )
 
 func main() {
+
+	recsNameSize := loadRecs()
+
 	err := portaudio.Initialize()
 	if err != nil {
 		return
 	}
 	defer portaudio.Terminate()
 
-	recs := loadRecs()
+	//recs := loadRecs()
 	rs, err := recInit()
 	if err != nil {
 		return
@@ -49,9 +52,14 @@ func main() {
 		}
 		go clickRec(rs)
 	}
+
 	cmdList := tui.NewList()
 	rs.CmdList = cmdList
-	cmdList.AddItems("noise", "play", "rec", "nums", "exit")
+	cmdList.AddItems(
+		//"noise",
+		"rec",
+		//"nums",
+		"exit")
 	cmdList.Select(0)
 	cmdList.OnItemActivated(func(l *tui.List) {
 		switch strings.ToLower(l.SelectedItem()) {
@@ -71,16 +79,19 @@ func main() {
 	cmdBox.SetBorder(true)
 
 	recList := tui.NewList()
-
+	historyBox := tui.NewVBox(recList)
 	recList.OnItemActivated(func(l *tui.List) {
 		go play(l.SelectedItem())
+	})
+	recList.OnSelectionChanged(func(l *tui.List) {
+
+		historyBox.SetTitle("wavs - " + l.SelectedItem() + fmt.Sprintf("- %d Bytes", rs.SizeList[l.Selected()].Size))
 	})
 
 	rs.RecList = recList
 
-	histAppend(rs.RecList, rs.UI, recs...)
-
-	historyBox := tui.NewVBox(recList)
+	histAppend(rs, recsNameSize...)
+	histAppend(rs, nameSize{"hi", 124})
 
 	historyBox.SetBorder(true)
 	historyBox.SetTitle("wavs")
@@ -110,7 +121,7 @@ func main() {
 			exit(ui)
 			return
 		}
-		histAppend(rs.RecList, rs.UI, e.Text())
+		histAppend(rs, nameSize{e.Text(), 0})
 		input.SetText("")
 	})
 
@@ -124,7 +135,7 @@ func exit(ui tui.UI) {
 	ui.Quit()
 }
 
-func loadRecs() (recs []string) {
+func loadRecs() (recsNameSize []nameSize) {
 	path := filepath.Join(".", "wavs")
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
@@ -134,10 +145,12 @@ func loadRecs() (recs []string) {
 		n := file.Name()
 		ext := filepath.Ext(n)
 		name := strings.TrimSuffix(n, ext)
-		if err != nil {
+		if err != nil || strings.ToLower(ext) != ".wav" {
 			continue
 		}
-		recs = append(recs, name)
+
+		recsNameSize = append(recsNameSize, nameSize{name, file.Size()})
+
 	}
 	return
 }
@@ -147,6 +160,7 @@ type RecSettings struct {
 	RecSlice  []int32
 	PlaySlice []int16
 	RecList   *tui.List
+	SizeList  []nameSize
 	UI        *tui.UI
 	CmdList   *tui.List
 }
@@ -159,8 +173,13 @@ type AudioChan struct {
 	PAStream *portaudio.Stream
 }
 
-func histAppend(box *tui.List, u *tui.UI, m ...string) {
-	box.AddItems(m...)
-	box.Select(box.Length() - 1)
-	(*u).Repaint()
+func histAppend(rs *RecSettings, fnsize ...nameSize) {
+	s := []string{}
+	for _, x := range fnsize {
+		s = append(s, x.Name)
+	}
+	rs.RecList.AddItems(s...)
+	rs.SizeList = append(rs.SizeList, fnsize...)
+	rs.RecList.Select(rs.RecList.Length() - 1)
+	(*rs.UI).Repaint()
 }

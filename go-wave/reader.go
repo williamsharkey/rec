@@ -101,7 +101,7 @@ func (rd *Reader) parseRiffChunk() error {
 	}
 	if chunkSize.ChunkSize+8 != uint32(rd.size) {
 		//		fmt.Println("======================")
-		//		fmt.Println("riff chunk size ", rd.riffChunk.ChunkSize)
+		//		fmt.Println("riff chunk size ", rd.RiffChunk.ChunkSize)
 		//		fmt.Println("file size ", rd.size)
 		//		fmt.Println("======================")
 		return fmt.Errorf("riff_chunk_size must be whole file size - 8bytes, expected(%d), actual(%d)", chunkSize.ChunkSize+8, rd.size)
