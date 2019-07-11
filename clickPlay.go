@@ -32,7 +32,7 @@ func clickPlay(fn string, setBtn func(string), rs *RecSettings) {
 				s.Active = false
 				//waveWriter.Close()
 				//waveFile.Close()
-				//histAppend(rs.RecList, rs.UI, fn)
+				//recAppend(rs.RecList, rs.UI, fn)
 				break LoopPlay
 			default:
 			}

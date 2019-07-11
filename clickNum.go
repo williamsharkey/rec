@@ -91,7 +91,7 @@ Loop2:
 			waveFile.Close()
 			//f,err:=waveFile.Stat()
 			//if err==nil{
-			histAppend(rs, nameSize{fn, 1234}) //f.Size()})
+			recAppend(rs, nameSize{fn, int64(waveWriter.RiffChunk.Size + 8)}) //f.Size()})
 			//}
 
 			break Loop2

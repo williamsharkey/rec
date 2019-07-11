@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-
+	//miditest()
 	recsNameSize := loadRecs()
 
 	err := portaudio.Initialize()
@@ -59,10 +59,13 @@ func main() {
 		//"noise",
 		"rec",
 		//"nums",
+		"midi",
 		"exit")
 	cmdList.Select(0)
 	cmdList.OnItemActivated(func(l *tui.List) {
 		switch strings.ToLower(l.SelectedItem()) {
+		case "midi":
+			playnote(1, 60)
 		case "noise":
 			go noise()
 		case "exit":
@@ -78,23 +81,27 @@ func main() {
 	cmdBox := tui.NewVBox(cmdList)
 	cmdBox.SetBorder(true)
 
+	histList := tui.NewList()
+	histListBox := tui.NewVBox(histList)
+	histListBox.SetBorder(true)
+	histListBox.SetTitle("log")
+
 	recList := tui.NewList()
-	historyBox := tui.NewVBox(recList)
+	recListBox := tui.NewVBox(recList)
 	recList.OnItemActivated(func(l *tui.List) {
 		go play(l.SelectedItem())
 	})
 	recList.OnSelectionChanged(func(l *tui.List) {
 
-		historyBox.SetTitle("wavs - " + l.SelectedItem() + fmt.Sprintf("- %d Bytes", rs.SizeList[l.Selected()].Size))
+		recListBox.SetTitle("wavs - " + l.SelectedItem() + fmt.Sprintf("- %d Bytes", rs.SizeList[l.Selected()].Size))
 	})
 
 	rs.RecList = recList
 
-	histAppend(rs, recsNameSize...)
-	histAppend(rs, nameSize{"hi", 124})
+	recAppend(rs, recsNameSize...)
 
-	historyBox.SetBorder(true)
-	historyBox.SetTitle("wavs")
+	recListBox.SetBorder(true)
+	recListBox.SetTitle("wavs")
 
 	input := tui.NewEntry()
 	input.SetSizePolicy(tui.Expanding, tui.Maximum)
@@ -105,7 +112,7 @@ func main() {
 
 	inputBox.SetSizePolicy(tui.Expanding, tui.Maximum)
 
-	chat := tui.NewVBox(historyBox, inputBox)
+	chat := tui.NewVBox(recListBox, histListBox, inputBox)
 	chat.SetSizePolicy(tui.Expanding, tui.Expanding)
 
 	hbox.Append(cmdBox)
@@ -121,7 +128,7 @@ func main() {
 			exit(ui)
 			return
 		}
-		histAppend(rs, nameSize{e.Text(), 0})
+		recAppend(rs, nameSize{e.Text(), 0})
 		input.SetText("")
 	})
 
@@ -173,7 +180,7 @@ type AudioChan struct {
 	PAStream *portaudio.Stream
 }
 
-func histAppend(rs *RecSettings, fnsize ...nameSize) {
+func recAppend(rs *RecSettings, fnsize ...nameSize) {
 	s := []string{}
 	for _, x := range fnsize {
 		s = append(s, x.Name)

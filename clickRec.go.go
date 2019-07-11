@@ -78,7 +78,7 @@ func clickRec(rs *RecSettings) {
 				//panic("yo")
 				//waveWriter.Close()
 				//waveFile.Close()
-				//histAppend(rs.RecList, rs.UI, fn)
+				//recAppend(rs.RecList, rs.UI, fn)
 				//break Loop2
 			case <-rs.Rec.Print:
 				//fmt.Println("s received", p)
@@ -106,7 +106,7 @@ func clickRec(rs *RecSettings) {
 				//f,err:=waveFile.Stat()
 				//if err==nil{waveWriter
 
-				histAppend(rs, nameSize{fn, int64(waveWriter.RiffChunk.Size)}) //f.Size()})
+				recAppend(rs, nameSize{fn, int64(waveWriter.RiffChunk.Size + 8)}) //f.Size()})
 				//}
 				break Loop2
 
